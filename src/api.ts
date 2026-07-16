@@ -92,9 +92,9 @@ export const fetchAllData = async () => {
       };
     }
     return null;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching data from server:", error);
-    return null; 
+    throw error;
   }
 };
 

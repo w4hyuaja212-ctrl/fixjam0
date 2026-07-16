@@ -21,15 +21,19 @@ export default function AdminLayout() {
 
   useEffect(() => {
     const loadData = async () => {
-      const allData = await fetchAllData();
-      if (allData) {
-        if (allData.tahunAjaran) setTahunAjaran(allData.tahunAjaran);
-        if (allData.kelas) setKelas(allData.kelas);
-        if (allData.siswa) setSiswa(allData.siswa);
-        if (allData.users) setUsers(allData.users);
-        if (allData.jadwal) setJadwal(allData.jadwal);
-      } else {
-        setErrorMsg('Gagal mengambil data dari server. Pastikan server/database sedang aktif.');
+      try {
+        const allData = await fetchAllData();
+        if (allData) {
+          if (allData.tahunAjaran) setTahunAjaran(allData.tahunAjaran);
+          if (allData.kelas) setKelas(allData.kelas);
+          if (allData.siswa) setSiswa(allData.siswa);
+          if (allData.users) setUsers(allData.users);
+          if (allData.jadwal) setJadwal(allData.jadwal);
+        } else {
+          setErrorMsg('Data tidak ditemukan atau format tidak valid.');
+        }
+      } catch (err: any) {
+        setErrorMsg('Error: ' + err.message);
       }
       setLoading(false);
     };
