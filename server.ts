@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import mysql from 'mysql2/promise';
-import { getPool } from './src/db';
+import { getPool, dbConfig } from './src/db';
 import { formatDate } from './src/utils';
 
 const app = express();
@@ -10,49 +10,29 @@ const PORT = 3000;
 
 app.use(express.json());
 
-// Database configuration
-const dbConfig = {
-  host: process.env.DB_HOST || '27.112.78.60',
-  user: process.env.DB_USER || 'smam1plg-ismuba',
-  password: process.env.DB_PASSWORD || process.env.DB_PASS || 'smam1plg-ismuba',
-  database: process.env.DB_NAME || 'smam1plg-ismuba',
-  port: parseInt(process.env.DB_PORT || '3306', 10),
-  connectTimeout: 10000,
-};
-
-let pool: mysql.Pool | null = null;
-
 // Initialize MySQL Connection Pool and Auto-Create/Verify Tables
 async function initDb() {
   try {
     console.log(`Connecting to MySQL database at ${dbConfig.host}:${dbConfig.port}...`);
-    pool = mysql.createPool({
-      ...dbConfig,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-    });
+    const pool = await getPool();
 
     // Test connection
     const conn = await pool.getConnection();
     console.log('Database connection successful!');
     conn.release();
 
-    // Create tables if they do not exist (using standard schema)
-    await createTables();
+    // Create tables if they do not exist
+    await createTables(pool);
 
-    // Run dynamic migration helper to add missing columns (e.g. cadangan_kultum)
-    await verifyAndMigrateColumns();
+    // Run dynamic migration helper to add missing columns
+    await verifyAndMigrateColumns(pool);
 
   } catch (err: any) {
     console.error('Failed to initialize MySQL Database:', err.message);
-    console.log('Using database mock/fallback handlers in memory...');
   }
 }
 
-async function createTables() {
-  if (!pool) return;
-  
+async function createTables(pool: mysql.Pool) {
   console.log('Verifying database tables...');
 
   // 1. TahunAjaran
@@ -117,8 +97,7 @@ async function createTables() {
   console.log('Base database tables verified!');
 }
 
-async function verifyAndMigrateColumns() {
-  if (!pool) return;
+async function verifyAndMigrateColumns(pool: mysql.Pool) {
   try {
     const [columns]: any = await pool.query('DESCRIBE `jadwal`');
     const columnNames = columns.map((col: any) => col.Field.toLowerCase());
@@ -137,25 +116,24 @@ async function verifyAndMigrateColumns() {
   }
 }
 
+// Helper to get pool and ensure connection
+async function getDbPool() {
+  return await getPool();
+}
 
-// ==========================================
 // API ENDPOINTS
-// ==========================================
 
-// Get all database records aggregated (mapping snake_case back to camelCase for the frontend)
+// Get all database records aggregated
 app.get('/api/all', async (req, res) => {
-  if (!pool) {
-    return res.status(500).json({ status: 'error', message: 'Database pool is not active.' });
-  }
-
   try {
+    const pool = await getDbPool();
     const [tahunAjaranRows] = await pool.query('SELECT * FROM tahun_ajaran ORDER BY id ASC');
     const [kelasRows] = await pool.query('SELECT * FROM kelas ORDER BY id ASC');
     const [siswaRows] = await pool.query('SELECT * FROM siswa ORDER BY id ASC');
     const [usersRows] = await pool.query('SELECT * FROM users ORDER BY id ASC');
     const [jadwalRows] = await pool.query('SELECT * FROM jadwal ORDER BY tanggal DESC, id DESC');
 
-    // Normalize types and map to frontend camelCase formats
+    // ... (rest of the mapping code)
     const tahunAjaran = (tahunAjaranRows as any[]).map(ta => ({
       id: String(ta.id),
       name: String(ta.name),
@@ -217,15 +195,13 @@ app.get('/api/all', async (req, res) => {
   }
 });
 
+
 // Single POST Router replicating GAS Post Routing for backward compatibility & minimum frontend rewrite
 app.post('/api/save', async (req, res) => {
-  if (!pool) {
-    return res.status(500).json({ status: 'error', message: 'Database pool is not active.' });
-  }
-
   const { action, data, id } = req.body;
 
   try {
+    const pool = await getDbPool();
     let resultId = id;
 
     if (action === 'saveTahunAjaran') {

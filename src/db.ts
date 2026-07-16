@@ -1,6 +1,6 @@
 import mysql from 'mysql2/promise';
 
-const dbConfig = {
+export const dbConfig = {
   host: process.env.DB_HOST || '27.112.78.60',
   user: process.env.DB_USER || 'smam1plg-ismuba',
   password: process.env.DB_PASSWORD || process.env.DB_PASS || 'smam1plg-ismuba',
