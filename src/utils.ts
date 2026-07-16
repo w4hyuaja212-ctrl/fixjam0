@@ -8,6 +8,18 @@ import {
 } from 'date-fns';
 import { id } from 'date-fns/locale';
 
+// Helper to format date consistently as YYYY-MM-DD without timezone shift
+export const formatDate = (dateVal: any): string => {
+  if (!dateVal) return '';
+  if (dateVal instanceof Date) {
+    const year = dateVal.getFullYear();
+    const month = String(dateVal.getMonth() + 1).padStart(2, '0');
+    const day = String(dateVal.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  return String(dateVal).split('T')[0]; // strip time if ISO
+};
+
 export function getCalendarDays(year: number, month: number) {
   const monthStart = startOfMonth(new Date(year, month));
   const monthEnd = endOfMonth(monthStart);

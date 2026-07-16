@@ -2,13 +2,15 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import mysql from 'mysql2/promise';
+import { getPool } from './src/db';
+import { formatDate } from './src/utils';
 
 const app = express();
 const PORT = 3000;
 
 app.use(express.json());
 
-// Database configuration with explicit defaults requested by the user
+// Database configuration
 const dbConfig = {
   host: process.env.DB_HOST || '27.112.78.60',
   user: process.env.DB_USER || 'smam1plg-ismuba',
@@ -19,18 +21,6 @@ const dbConfig = {
 };
 
 let pool: mysql.Pool | null = null;
-
-// Helper to format date consistently as YYYY-MM-DD without timezone shift
-const formatDate = (dateVal: any): string => {
-  if (!dateVal) return '';
-  if (dateVal instanceof Date) {
-    const year = dateVal.getFullYear();
-    const month = String(dateVal.getMonth() + 1).padStart(2, '0');
-    const day = String(dateVal.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-  return String(dateVal).split('T')[0]; // strip time if ISO
-};
 
 // Initialize MySQL Connection Pool and Auto-Create/Verify Tables
 async function initDb() {
@@ -412,4 +402,8 @@ async function startServer() {
   });
 }
 
-startServer();
+export default app;
+
+if (import.meta.url === new URL(process.argv[1], 'file://').href) {
+  startServer();
+}
