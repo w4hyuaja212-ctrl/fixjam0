@@ -93,7 +93,7 @@ export const fetchAllData = async () => {
     }
     return null;
   } catch (error) {
-    console.error("Error fetching from GAS:", error);
+    console.error("Error fetching data from server:", error);
     return null; 
   }
 };

@@ -29,7 +29,7 @@ export default function AdminLayout() {
         if (allData.users) setUsers(allData.users);
         if (allData.jadwal) setJadwal(allData.jadwal);
       } else {
-        setErrorMsg('Gagal mengambil data dari Google Apps Script. Pastikan Anda telah men-deploy kode GAS_CODE.gs yang baru.');
+        setErrorMsg('Gagal mengambil data dari server. Pastikan server/database sedang aktif.');
       }
       setLoading(false);
     };
