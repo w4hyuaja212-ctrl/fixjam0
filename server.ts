@@ -14,7 +14,7 @@ app.use(express.json());
 // Initialize Database Connection Pool and Auto-Create/Verify Tables
 async function initDb() {
   try {
-    console.log(`Connecting to Postgres database...`);
+    console.log(`Connecting to Postgres database with URL: ${process.env.POSTGRES_URL ? 'set' : 'not set'}`);
     const pool = await getPool();
 
     // Test connection
@@ -347,10 +347,10 @@ app.post('/api/save', async (req, res) => {
 // Service configuration sync for Client UI
 app.get('/api/db-config', (req, res) => {
   res.json({
-    host: dbConfig.host,
-    user: dbConfig.user,
-    database: dbConfig.database,
-    port: dbConfig.port
+    host: 'hidden',
+    user: 'hidden',
+    database: 'hidden',
+    port: 0
   });
 });
 
