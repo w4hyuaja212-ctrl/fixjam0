@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Remix: Remix: Kalender Akademik - SMA Muhammadiyah 1 Palembang",
+  "description": "Sistem Informasi Kalender Akademik dan Hari Efektif Sekolah",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
