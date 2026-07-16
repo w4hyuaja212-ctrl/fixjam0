@@ -1,8 +1,9 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import mysql from 'mysql2/promise';
-import { getPool, dbConfig } from './src/db';
+import { Pool } from 'pg';
+import { getPool } from './src/db';
 import { formatDate } from './src/utils';
 
 const app = express();
@@ -10,14 +11,14 @@ const PORT = 3000;
 
 app.use(express.json());
 
-// Initialize MySQL Connection Pool and Auto-Create/Verify Tables
+// Initialize Database Connection Pool and Auto-Create/Verify Tables
 async function initDb() {
   try {
-    console.log(`Connecting to MySQL database at ${dbConfig.host}:${dbConfig.port}...`);
+    console.log(`Connecting to Postgres database...`);
     const pool = await getPool();
 
     // Test connection
-    const conn = await pool.getConnection();
+    const conn = await pool.connect();
     console.log('Database connection successful!');
     conn.release();
 
@@ -28,11 +29,11 @@ async function initDb() {
     await verifyAndMigrateColumns(pool);
 
   } catch (err: any) {
-    console.error('Failed to initialize MySQL Database:', err.message);
+    console.error('Failed to initialize Database:', err.message);
   }
 }
 
-async function createTables(pool: mysql.Pool) {
+async function createTables(pool: Pool) {
   console.log('Verifying database tables...');
 
   // 1. TahunAjaran
@@ -40,8 +41,8 @@ async function createTables(pool: mysql.Pool) {
     CREATE TABLE IF NOT EXISTS tahun_ajaran (
       id VARCHAR(255) PRIMARY KEY,
       name VARCHAR(255) NOT NULL,
-      is_active TINYINT(1) DEFAULT 0
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+      is_active BOOLEAN DEFAULT false
+    );
   `);
 
   // 2. Kelas
@@ -51,7 +52,7 @@ async function createTables(pool: mysql.Pool) {
       name VARCHAR(255) NOT NULL,
       wali_kelas VARCHAR(255) DEFAULT '',
       gedung VARCHAR(50) DEFAULT 'A'
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    );
   `);
 
   // 3. Siswa
@@ -61,7 +62,7 @@ async function createTables(pool: mysql.Pool) {
       nis VARCHAR(255) DEFAULT '',
       name VARCHAR(255) NOT NULL,
       kelas_id VARCHAR(255) DEFAULT ''
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    );
   `);
 
   // 4. Users
@@ -71,7 +72,7 @@ async function createTables(pool: mysql.Pool) {
       username VARCHAR(255) NOT NULL UNIQUE,
       role VARCHAR(50) DEFAULT 'piket',
       name VARCHAR(255) DEFAULT ''
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    );
   `);
 
   // 5. Jadwal
@@ -91,24 +92,24 @@ async function createTables(pool: mysql.Pool) {
       azan_gedung_b VARCHAR(255) DEFAULT '',
       tadarus_gedung_a VARCHAR(255) DEFAULT '',
       tadarus_gedung_b VARCHAR(255) DEFAULT ''
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    );
   `);
 
   console.log('Base database tables verified!');
 }
 
-async function verifyAndMigrateColumns(pool: mysql.Pool) {
+async function verifyAndMigrateColumns(pool: Pool) {
   try {
-    const [columns]: any = await pool.query('DESCRIBE `jadwal`');
-    const columnNames = columns.map((col: any) => col.Field.toLowerCase());
+    const res = await pool.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'jadwal'");
+    const columnNames = res.rows.map((row: any) => row.column_name.toLowerCase());
 
     if (!columnNames.includes('cadangan_kultum_gedung_a')) {
       console.log('Migrating: Adding column cadangan_kultum_gedung_a to table jadwal...');
-      await pool.query('ALTER TABLE `jadwal` ADD COLUMN `cadangan_kultum_gedung_a` VARCHAR(255) DEFAULT \'\'');
+      await pool.query('ALTER TABLE jadwal ADD COLUMN cadangan_kultum_gedung_a VARCHAR(255) DEFAULT \'\'');
     }
     if (!columnNames.includes('cadangan_kultum_gedung_b')) {
       console.log('Migrating: Adding column cadangan_kultum_gedung_b to table jadwal...');
-      await pool.query('ALTER TABLE `jadwal` ADD COLUMN `cadangan_kultum_gedung_b` VARCHAR(255) DEFAULT \'\'');
+      await pool.query('ALTER TABLE jadwal ADD COLUMN cadangan_kultum_gedung_b VARCHAR(255) DEFAULT \'\'');
     }
     console.log('All dynamic column migrations verified!');
   } catch (err: any) {
@@ -127,41 +128,41 @@ async function getDbPool() {
 app.get('/api/all', async (req, res) => {
   try {
     const pool = await getDbPool();
-    const [tahunAjaranRows] = await pool.query('SELECT * FROM tahun_ajaran ORDER BY id ASC');
-    const [kelasRows] = await pool.query('SELECT * FROM kelas ORDER BY id ASC');
-    const [siswaRows] = await pool.query('SELECT * FROM siswa ORDER BY id ASC');
-    const [usersRows] = await pool.query('SELECT * FROM users ORDER BY id ASC');
-    const [jadwalRows] = await pool.query('SELECT * FROM jadwal ORDER BY tanggal DESC, id DESC');
+    const tahunAjaranRows = await pool.query('SELECT * FROM tahun_ajaran ORDER BY id ASC');
+    const kelasRows = await pool.query('SELECT * FROM kelas ORDER BY id ASC');
+    const siswaRows = await pool.query('SELECT * FROM siswa ORDER BY id ASC');
+    const usersRows = await pool.query('SELECT * FROM users ORDER BY id ASC');
+    const jadwalRows = await pool.query('SELECT * FROM jadwal ORDER BY tanggal DESC, id DESC');
 
-    // ... (rest of the mapping code)
-    const tahunAjaran = (tahunAjaranRows as any[]).map(ta => ({
+    // Normalize types and map to frontend camelCase formats
+    const tahunAjaran = (tahunAjaranRows.rows as any[]).map(ta => ({
       id: String(ta.id),
       name: String(ta.name),
       isActive: ta.is_active === 1 || ta.is_active === true
     }));
 
-    const kelas = (kelasRows as any[]).map(k => ({
+    const kelas = (kelasRows.rows as any[]).map(k => ({
       id: String(k.id),
       name: String(k.name),
       waliKelas: String(k.wali_kelas || ''),
       gedung: k.gedung === 'B' ? 'B' : 'A'
     }));
 
-    const siswa = (siswaRows as any[]).map(s => ({
+    const siswa = (siswaRows.rows as any[]).map(s => ({
       id: String(s.id),
       nis: String(s.nis || ''),
       name: String(s.name),
       kelasId: String(s.kelas_id || '')
     }));
 
-    const users = (usersRows as any[]).map(u => ({
+    const users = (usersRows.rows as any[]).map(u => ({
       id: String(u.id),
       username: String(u.username),
       role: u.role === 'admin' ? 'admin' : 'piket',
       name: String(u.name || '')
     }));
 
-    const jadwal = (jadwalRows as any[]).map(j => ({
+    const jadwal = (jadwalRows.rows as any[]).map(j => ({
       id: String(j.id),
       tanggal: formatDate(j.tanggal),
       jamKe0GedungA: String(j.jam_ke_0_gedung_a || ''),
